@@ -351,6 +351,47 @@ config = {'configurable': {'thread_id': '1'}}
 response = graph.invoke({"messages": messages}, config=config)
 ```
 
+💡 Concept
+
+Each user session (or “conversation”) can have its own unique thread_id.
+MemorySaver uses that ID to store and recall all messages, context, and model outputs for that specific user only.
+
+🧩 Example Setup
+memory = MemorySaver()
+graph = builder.compile(checkpointer=memory)
+
+Now, say you have two users: Alice and Bob.
+config_alice = {'configurable': {'thread_id': 'alice'}}
+config_bob = {'configurable': {'thread_id': 'bob'}}
+
+Then:
+graph.invoke("Hi, I’m Alice", config_alice)
+graph.invoke("Hi, I’m Bob", config_bob)
+graph.invoke("What did I just say?", config_alice)
+
+🧠 Internally
+Alice’s conversation is stored under thread_id = "alice"
+Bob’s conversation is stored under thread_id = "bob"
+When Alice asks “What did I just say?”, the system retrieves only Alice’s previous messages — not Bob’s.
+So each thread_id = one independent user memory space.
+
+🔄 Persistence and Reuse
+If you keep the same MemorySaver instance alive (e.g., in memory or persisted to disk),
+you can resume conversations for any user later — just by reusing the same thread_id.
+
+For example:
+graph.invoke("Continue our chat", {'configurable': {'thread_id': 'alice'}})
+→ recalls everything Alice said before.
+
+⚠️ Important Tips
+Unique IDs per user
+Use user-specific IDs (like their user_id or email hash) for thread_id.
+
+Shared MemorySaver
+You can safely use one MemorySaver() across all users — it isolates conversations automatically.
+Persistence across restarts
+If you restart your app, you can serialize the MemorySaver state (e.g., save it to S3, Redis, or a DB) to retain memory between sessions.
+
 **Key Components:**
 1. **MemorySaver**: Creates an in-memory checkpoint store
 2. **checkpointer**: Passed to `graph.compile()` to enable state persistence
